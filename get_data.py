@@ -3,10 +3,11 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
 import time
 import asyncio
+import sys
 
 SEASONS = list(range(2016,2024))
 DATA_DIR = "data"
-STANDINGS_DIR = os.path.join(DATA_DIR, "standings")
+SCHEDULES_DIR = os.path.join(DATA_DIR, "schedules")
 SCORES_DIR = os.path.join(DATA_DIR, "scores")
 
 # grab specified html give the url and selector
@@ -32,22 +33,42 @@ async def get_html(url, selector, sleep = 5, retries = 3):
 # scrape links for the box score tables in that season
 async def scrape_season(season):
     url = f"https://www.basketball-reference.com/leagues/NBA_{season}_games.html"
-    html = asyncio.run(fetch_data(url))
+    html = await fetch_data(url)
 
     soup = BeautifulSoup(html)
     links = soup.find_all("a") # get anchor tags
-    href = [l["href"] for l in links] # parse links
-    standings_pages = [f"https://basketball-reference.com{l}" for l in href] # transform links into full urls
+    href = [l.get("href") for l in links] # parse links
+    schedules_pages = [f"https://basketball-reference.com{l}" for l in href] # transform links into full urls
 
-    for url in standings_pages:
-        path = os.path.join(STANDINGS_DIR, url.split("/")[-1]) # create path to file based off url
+    for url in schedules_pages:
+        path = os.path.join(SCHEDULES_DIR, url.split("/")[-1]) # create path to file based off url
         if os.path.exists(path):
             continue # continue if page is already scraped
 
-        html = await get_html(url, "#all_schedule") # grab html for standings table
+        html = await get_html(url, "#all_schedule") # grab html for schedule table
         with open(path, "w+") as f:
             f.write(html)
 
+# scrape a schedule file and save all the box scores into scores
+async def scrape_game(schedules_file):
+    with open(schedules_file, 'r') as f:
+        html = f.read()
+
+    soup = BeautifulSoup(html)
+    links = soup.find_all("a")
+    hrefs = [l.get("href") for l in links]
+    box_scores = [l for l in hrefs if l and "boxscore" in l and ".html" in l]
+
+    for url in box_scores:
+        save_path = os.path.join(SCORES_DIR, url.split("/")[-1])
+        if os.path.exists(save_path):
+            continue
+
+        html = await get_html(url, "#content")
+        if not html:
+            continue
+        with open(save_path, "w+") as f:
+            f.write(html)
 
 
 async def fetch_data(url):
@@ -55,10 +76,38 @@ async def fetch_data(url):
     print(html)
     return html
 
-async def fetch_box_scores(season):
+async def fetch_schedule(season):
     await scrape_season(season)
 
-for season in SEASONS:
-    fetch_box_scores(season)
+async def main():
+    if len(sys.argv) < 2:
+        # scrape season schedules into schedule directory
+        await asyncio.gather(*(scrape_season(season) for season in SEASONS))
+
+        # list of all html files in schedule directory
+        schedules_files = [f for f in os.listdir(SCHEDULES_DIR) if f.endswith('.html')]
+
+        # scrape games for each html file
+        for f in schedules_files:
+            filepath = os.path.join(SCHEDULES_DIR, f) # get full file path
+            await scrape_game(filepath)
+
+    else:
+        command = sys.argv[1]
+
+        if command == "schedules":
+            print("Scraping Schedules")
+            await asyncio.gather(*(scrape_season(season) for season in SEASONS))
+            print("Finished Scraping Schedules")
+
+        elif command == "games":
+            print("Scraping Games From Schedules")
+            for f in schedules_files:
+                filepath = os.path.join(SCHEDULES_DIR, f) # get full file path
+                await scrape_game(filepath)
+            print("Finished Scraping Games")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 
 
