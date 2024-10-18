@@ -43,11 +43,16 @@ async def scrape_season(season):
     for url in schedules_pages:
         path = os.path.join(SCHEDULES_DIR, url.split("/")[-1]) # create path to file based off url
         if os.path.exists(path):
+            print(f"{path} already exists")
             continue # continue if page is already scraped
 
         html = await get_html(url, "#all_schedule") # grab html for schedule table
-        with open(path, "w+") as f:
-            f.write(html)
+        if html is not None:
+            with open(path, "w+") as f:
+                f.write(html)
+
+        else:
+            print(f"{html} is None")
 
 # scrape a schedule file and save all the box scores into scores
 async def scrape_game(schedules_file):
@@ -58,16 +63,18 @@ async def scrape_game(schedules_file):
     links = soup.find_all("a")
     hrefs = [l.get("href") for l in links]
     box_scores = [l for l in hrefs if l and "boxscore" in l and ".html" in l]
+    box_scores = [f"https://www.basketball-reference.com{l}" for l in box_scores]
 
     for url in box_scores:
         save_path = os.path.join(SCORES_DIR, url.split("/")[-1])
         if os.path.exists(save_path):
+            print(f"{save_path} already exists")
             continue
 
         html = await get_html(url, "#content")
         if not html:
             continue
-        with open(save_path, "w+") as f:
+        with open(save_path, "w+", encoding='utf-8') as f:
             f.write(html)
 
 
@@ -97,15 +104,25 @@ async def main():
 
         if command == "schedules":
             print("Scraping Schedules")
+
             await asyncio.gather(*(scrape_season(season) for season in SEASONS))
+
             print("Finished Scraping Schedules")
 
         elif command == "games":
             print("Scraping Games From Schedules")
+
+            schedules_files = [f for f in os.listdir(SCHEDULES_DIR) if f.endswith('.html')]
+
             for f in schedules_files:
                 filepath = os.path.join(SCHEDULES_DIR, f) # get full file path
                 await scrape_game(filepath)
+                
             print("Finished Scraping Games")
+
+        if command.isdigit:
+            print(f"Scraping {command} season")
+            await scrape_season(command)
 
 if __name__ == "__main__":
     asyncio.run(main())
