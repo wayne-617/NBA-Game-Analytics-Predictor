@@ -11,7 +11,7 @@ box_scores = os.listdir(SCORES_DIR) # list of files from scores
 box_scores = [os.path.join(SCORES_DIR, f) for f in box_scores if f.endswith(".html")] # create full path to files that end with .html
 
 def parse_html(box_score):
-    with open(box_score) as f:
+    with open(box_score, 'r', encoding='ISO-8859-1') as f:
         html = f.read()
 
     soup = BeautifulSoup(html, features="html.parser")
@@ -54,11 +54,10 @@ def main():
     print(len(box_scores))
 
     for box_score in tqdm(box_scores, desc="Processing Games"):
-        soup = parse_html(box_scores) # parse box score
+        soup = parse_html(box_score) # parse box score
 
         line_score = read_line_score(soup) # get line score of the game
         teams = list(line_score["team"]) # get teams in the game
-        print(teams)
 
         summaries = []
         for team in teams:
@@ -69,7 +68,6 @@ def main():
             # get totals
             totals = pd.concat([basic.iloc[-1], advanced.iloc[-1]]) # combine totals of basic stats and advanced stats into pd series
             totals.index = totals.index.str.lower()
-            print(totals)
 
             # get maxes
             maxes = pd.concat([basic.iloc[:-1].max(), advanced.iloc[:-1].max()]) # get maxes of all columns into 
@@ -80,14 +78,12 @@ def main():
             if base_cols is None:
                 base_cols = list(summary.index.drop_duplicates(keep="first")) # define values to look for in box scores and remove duplicates
                 base_cols = [b for b in base_cols if "bpm" not in b] # remove plus-minus stat
-                print(f"Base Cols: {base_cols}")
         
             summary = summary[base_cols] # parse summaries to just contain the base columns
 
             summaries.append(summary)
             
         summary = pd.concat(summaries, axis = 1).T # merge summaries and transpose so that each game is a row and columns are stats
-        print(summary)
 
         game = pd.concat([summary, line_score], axis = 1) # add line score as columns
         game["home"] = [0 , 1] # add home column where first team is away team and second is home team
@@ -102,7 +98,7 @@ def main():
         # add additional columns
         full_game["season"] = get_season(soup) # add season as column
         full_game["date"] = os.path.basename(box_score)[:8]
-        full_game["date"] = pd.to_datetime(full_game["date"], format="%Y$m$d") # add date
+        full_game["date"] = pd.to_datetime(full_game["date"], format="%Y%m%d") # add date
         full_game["won"] = full_game["total"] > full_game["total_opp"] # add whether or not they won
 
         games.append(full_game)

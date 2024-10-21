@@ -120,7 +120,7 @@ async def main():
                 
             print("Finished Scraping Games")
 
-        if command.isdigit:
+        elif command.isdigit:
             print(f"Scraping {command} season")
             await scrape_season(command)
 
