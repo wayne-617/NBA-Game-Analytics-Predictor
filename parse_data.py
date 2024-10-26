@@ -11,7 +11,7 @@ box_scores = os.listdir(SCORES_DIR) # list of files from scores
 box_scores = [os.path.join(SCORES_DIR, f) for f in box_scores if f.endswith(".html")] # create full path to files that end with .html
 
 def parse_html(box_score):
-    with open(box_score, 'r', encoding='ISO-8859-1') as f:
+    with open(box_score, 'r', encoding='utf-8', errors='replace') as f:
         html = f.read()
 
     soup = BeautifulSoup(html, features="html.parser")
